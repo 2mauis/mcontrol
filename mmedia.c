@@ -142,33 +142,40 @@ void run()
 		p = (char *)malloc(sizeof(char)* 60);
 		token = strtok_s(request, " ", &p);
 		token = strtok_s(NULL, " ", &p);
+		printf("%s", token);
 
-		if (strcmp(token, "/next") == 0)
+		if (token != NULL)
 		{
-			play_next();
+			if (strcmp(token, "/next") == 0)
+			{
+				play_next();
+			}
+			else if (strcmp(token, "/prev") == 0)
+			{
+				play_prev();
+			}
+			else if (strcmp(token, "/play") == 0)
+			{
+				play();
+			}
+			else if (strcmp(token, "/up") == 0)
+			{
+				volume_up();
+			}
+			else if (strcmp(token, "/down") == 0)
+			{
+				volume_down();
+			}
+			else if (strcmp(token, "/mute") == 0)
+			{
+				mute();
+			}
 		}
-		else if (strcmp(token, "/prev") == 0)
+		else
 		{
-			play_prev();
+			break;
 		}
-		else if (strcmp(token, "/play") == 0)
-		{
-			play();
-		}
-		else if (strcmp(token, "/up") == 0)
-		{
-			volume_up();
-		}
-		else if (strcmp(token, "/down") == 0)
-		{
-			volume_down();
-		}
-		else if (strcmp(token, "/mute") == 0)
-		{
-			mute();
-		}
-
-		char *file = "D:/www/git/mmedia/index.html";
+		char *file = "E:\\www\\git\\mmedia\\index.html";
 		char *content;
 		content = (char *)malloc(sizeof(char)* MAX_FILE_SIZE);
 		int fs = load_file(file, content);
@@ -190,9 +197,9 @@ void run()
 		}
 		/**/
 
-		free(content);
 	}
 
+	//free(content);
 	closesocket(client);
 }
 
