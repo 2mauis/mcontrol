@@ -1,10 +1,10 @@
-// mmedia.cpp : ∂®“Âøÿ÷∆Ã®”¶”√≥Ã–Úµƒ»Îø⁄µ„°£
+// mmedia.cpp : ÂÆö‰πâÊéßÂà∂Âè∞Â∫îÁî®Á®ãÂ∫èÁöÑÂÖ•Âè£ÁÇπ„ÄÇ
 //
 
 /**
 * TODO:
-* 1. ∑‚◊∞socket
-* 2. ∂¡Œƒº˛
+* 1. Â∞ÅË£Ösocket
+* 2. ËØªÊñá‰ª∂
 *
 */
 #include "stdafx.h"
@@ -81,6 +81,7 @@ int load_file(char *file_name, char *content)
 	return file_size;
 }
 
+
 void run()
 {
 	WSADATA wsa;
@@ -91,6 +92,7 @@ void run()
 	}
 
 	SOCKET server_socket;
+	SOCKET socket_pool[FD_SETSIZE - 1];
 	server_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
 	if (server_socket == INVALID_SOCKET)
@@ -124,25 +126,48 @@ void run()
 
 	printf("Server is listening on %s\n", "*:56789");
 
-	SOCKET client;
-	struct sockaddr_in client_addr;
-	memset(&client_addr, 0, sizeof(struct sockaddr_in));
-	client = accept(server_socket, (struct sockaddr*)&client_addr, 0);
-	if (client == INVALID_SOCKET)
-	{
-		printf("Invalid socket");
-	}
-
 	while (true)
 	{
+		SOCKET client;
+		struct sockaddr_in client_addr;
+		memset(&client_addr, 0, sizeof(struct sockaddr_in));
+		client = accept(server_socket, (struct sockaddr*)&client_addr, 0);
+		if (client == INVALID_SOCKET)
+		{
+			printf("Invalid socket");
+		}
+		//printf("Access success\n");
+
 		char request[4096];
 		int receive_rs = recv(client, request, sizeof(request), 0);
+		char *file = "D:/www/git/mmedia/index.html";
+		char *content;
+		content = (char *)malloc(sizeof(char)* MAX_FILE_SIZE);
+		int fs = load_file(file, content);
+
+		if (fs == -1)
+		{
+			printf("Unable to load file: %s", file);
+		}
+		else
+		{
+			char *response;
+			response = (char *)malloc(sizeof(char)* MAX_FILE_SIZE);
+			_snprintf(response, 10240, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n%s", fs, content);
+			//printf("%d", strlen(response));
+			receive_rs = send(client, response, strlen(response), 0);
+			free(response);
+		}
+
+		free(content);
+		closesocket(client);
+
 		char *token, *p;
 		token = (char *)malloc(sizeof(char)* 60);
 		p = (char *)malloc(sizeof(char)* 60);
 		token = strtok_s(request, " ", &p);
 		token = strtok_s(NULL, " ", &p);
-		printf("%s", token);
+		printf("%s\n", token);
 
 		if (token != NULL)
 		{
@@ -171,36 +196,7 @@ void run()
 				mute();
 			}
 		}
-		else
-		{
-			break;
-		}
-		char *file = "E:\\www\\git\\mmedia\\index.html";
-		char *content;
-		content = (char *)malloc(sizeof(char)* MAX_FILE_SIZE);
-		int fs = load_file(file, content);
-		//printf("\nfs: %d\nstrlen: %d\n", fs, strlen(content));
-		//printf(content);
-		/**/
-		if (fs == -1)
-		{
-			printf("Unable to load file: %s", file);
-		}
-		else
-		{
-			char *response;
-			response = (char *)malloc(sizeof(char)* MAX_FILE_SIZE);
-			_snprintf(response, 10240, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n%s", fs, content);
-			//printf("%d", strlen(response));
-			receive_rs = send(client, response, strlen(response), 0);
-			free(response);
-		}
-		/**/
-
 	}
-
-	//free(content);
-	closesocket(client);
 }
 
 void volume_up()
