@@ -1,4 +1,4 @@
-mmedia
+mcontrol
 ======
 
-mmedia
+Multimedia remote control

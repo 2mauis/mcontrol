@@ -1,19 +1,13 @@
-// mmedia.cpp : å®šä¹‰æ§åˆ¶å°åº”ç”¨ç¨‹åºçš„å…¥å£ç‚¹ã€‚
+// mcontrol.cpp : ¶¨Òå¿ØÖÆÌ¨Ó¦ÓÃ³ÌĞòµÄÈë¿Úµã¡£
 //
 
-/**
-* TODO:
-* 1. å°è£…socket
-* 2. è¯»æ–‡ä»¶
-*
-*/
 #include "stdafx.h"
 
 #include <Windows.h>
 #include <WinSock.h>
 #include <stdlib.h>
 #pragma comment( lib, "ws2_32.lib" )
-#define MAX_FILE_SIZE 10240
+#define BUF_SIZE 4096
 
 // volume up
 void volume_up();
@@ -91,47 +85,63 @@ void run()
 		exit(-1);
 	}
 
-	SOCKET server_socket;
-	SOCKET socket_pool[FD_SETSIZE - 1];
-	server_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	SOCKET server_fd;
 
-	if (server_socket == INVALID_SOCKET)
+	server_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+
+	if (server_fd == INVALID_SOCKET)
 	{
 		printf("Invalid socket");
 		exit(-1);
 	}
 
 	struct sockaddr_in server_addr;
+	int port = 56789;
 	memset(&server_addr, 0, sizeof(struct sockaddr_in));
 	server_addr.sin_family = AF_INET;
 	server_addr.sin_addr.s_addr = INADDR_ANY;
-	server_addr.sin_port = htons(56789);
+	server_addr.sin_port = htons(port);
 
-	int bind_rs = 0;
-	bind_rs = bind(server_socket, (struct sockaddr*)&server_addr, sizeof(server_addr));
-
-	if (bind_rs == SOCKET_ERROR)
+	if (bind(server_fd, (struct sockaddr*)&server_addr, sizeof(server_addr)) == SOCKET_ERROR)
 	{
 		printf("Socket bind error");
 		exit(-1);
 	}
 
-	int listen_rs = 0;
-	listen_rs = listen(server_socket, SOMAXCONN);
-	if (listen_rs == SOCKET_ERROR)
+	if (listen(server_fd, SOMAXCONN) == SOCKET_ERROR)
 	{
 		printf("Socket execute error");
 		exit(-1);
 	}
 
-	printf("Server is listening on %s\n", "*:56789");
+	char hostname[255];
+	char *ip;
+	struct hostent *hostinfo;
+	if (gethostname(hostname, sizeof(hostname)) == 0)
+	{
+		if ((hostinfo = gethostbyname(hostname)) != NULL)
+		{
+			ip = inet_ntoa(*(struct in_addr *)*hostinfo->h_addr_list);
+			printf("Server is listening on %s:%d\n", ip, port);
+		}
+		else
+		{
+			printf("Server is listening on *:%d\n", port);
+		}
+	}
+	else
+	{
+		printf("Server is listening on :*%d\n", port);
+	}
+	
+	
 
 	while (true)
 	{
 		SOCKET client;
 		struct sockaddr_in client_addr;
 		memset(&client_addr, 0, sizeof(struct sockaddr_in));
-		client = accept(server_socket, (struct sockaddr*)&client_addr, 0);
+		client = accept(server_fd, (struct sockaddr*)&client_addr, 0);
 		if (client == INVALID_SOCKET)
 		{
 			printf("Invalid socket");
@@ -140,9 +150,9 @@ void run()
 
 		char request[4096];
 		int receive_rs = recv(client, request, sizeof(request), 0);
-		char *file = "D:/www/git/mmedia/index.html";
+		char *file = "html/index.html";
 		char *content;
-		content = (char *)malloc(sizeof(char)* MAX_FILE_SIZE);
+		content = (char *)malloc(sizeof(char)* BUF_SIZE);
 		int fs = load_file(file, content);
 
 		if (fs == -1)
@@ -152,8 +162,9 @@ void run()
 		else
 		{
 			char *response;
-			response = (char *)malloc(sizeof(char)* MAX_FILE_SIZE);
-			_snprintf(response, 10240, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n%s", fs, content);
+			response = (char *)malloc(sizeof(char)* BUF_SIZE);
+			sprintf_s(response, BUF_SIZE, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n%s", fs, content);
+			//_snprintf(response, BUF_SIZE, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n%s", fs, content);
 			//printf("%d", strlen(response));
 			receive_rs = send(client, response, strlen(response), 0);
 			free(response);
@@ -197,6 +208,8 @@ void run()
 			}
 		}
 	}
+
+	closesocket(server_fd);
 }
 
 void volume_up()
