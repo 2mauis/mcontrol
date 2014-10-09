@@ -133,8 +133,9 @@ void run()
 	{
 		printf("Server is listening on :*%d\n", port);
 	}
-	
-	
+	char doccmd[BUF_SIZE];
+	sprintf_s(doccmd, BUF_SIZE, "start http://127.0.0.1:%d/html/help.html", port);
+	system(doccmd);
 
 	while (true)
 	{
@@ -149,33 +150,16 @@ void run()
 		//printf("Access success\n");
 
 		char request[4096];
-		int receive_rs = recv(client, request, sizeof(request), 0);
-		char *file = "html/index.html";
+		char *token, *p;
 		char *content;
 		content = (char *)malloc(sizeof(char)* BUF_SIZE);
-		int fs = load_file(file, content);
+		char htmlfile[255];
 
-		if (fs == -1)
-		{
-			printf("Unable to load file: %s", file);
-		}
-		else
-		{
-			char *response;
-			response = (char *)malloc(sizeof(char)* BUF_SIZE);
-			sprintf_s(response, BUF_SIZE, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n%s", fs, content);
-			//_snprintf(response, BUF_SIZE, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n%s", fs, content);
-			//printf("%d", strlen(response));
-			receive_rs = send(client, response, strlen(response), 0);
-			free(response);
-		}
+		token = (char *)malloc(sizeof(char)* 255);
+		p = (char *)malloc(sizeof(char)* 255);
 
-		free(content);
-		closesocket(client);
-
-		char *token, *p;
-		token = (char *)malloc(sizeof(char)* 60);
-		p = (char *)malloc(sizeof(char)* 60);
+		int receive_rs = recv(client, request, sizeof(request), 0);
+	
 		token = strtok_s(request, " ", &p);
 		token = strtok_s(NULL, " ", &p);
 		printf("%s\n", token);
@@ -206,7 +190,34 @@ void run()
 			{
 				mute();
 			}
+
+			strcpy_s(htmlfile, token);
 		}
+		else
+		{
+			char *index = "html/index.html";
+			strcpy_s(htmlfile, index);
+		}
+
+		// 加载要显示的页面
+		char *html;
+		html = (char *)malloc(sizeof(char)* BUF_SIZE);
+		int size_html = load_file(htmlfile, html);
+		printf("Loading file: %s\n", token);
+
+		if (size_html == -1)
+		{
+			sprintf_s(content, BUF_SIZE, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n%s", BUF_SIZE, "<h1>404 NOT FOUND</h1>");
+		}
+		else
+		{
+			sprintf_s(content, BUF_SIZE, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n%s", size_html, html);
+		}
+		receive_rs = send(client, content, strlen(content), 0);
+		free(content);
+		free(html);
+
+		closesocket(client);
 	}
 
 	closesocket(server_fd);
