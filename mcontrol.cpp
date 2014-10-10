@@ -9,6 +9,14 @@
 #pragma comment( lib, "ws2_32.lib" )
 #define BUF_SIZE 4096
 
+struct req_head{
+	char method[7];
+	char host[255];
+	char path[255];
+};
+
+struct req_head parse_request(char *request);
+
 // volume up
 void volume_up();
 
@@ -159,10 +167,12 @@ void run()
 		p = (char *)malloc(sizeof(char)* 255);
 
 		int receive_rs = recv(client, request, sizeof(request), 0);
+		parse_request(request);
+		//printf("%s\n", request);
 	
 		token = strtok_s(request, " ", &p);
 		token = strtok_s(NULL, " ", &p);
-		printf("%s\n", token);
+		//printf("%s\n", token);
 
 		if (token != NULL)
 		{
@@ -203,7 +213,7 @@ void run()
 		char *html;
 		html = (char *)malloc(sizeof(char)* BUF_SIZE);
 		int size_html = load_file(htmlfile, html);
-		printf("Loading file: %s\n", token);
+		//printf("Loading file: %s\n", token);
 
 		if (size_html == -1)
 		{
@@ -221,6 +231,24 @@ void run()
 	}
 
 	closesocket(server_fd);
+}
+
+struct req_head parse_request(char *request)
+{
+	char *token, *buf;
+	struct req_head head;
+	memset(&head, 0, sizeof(head));
+
+	// The initial line
+	token = strtok_s(request, "\r\n", &buf);
+	printf("Token1: %s\n", token);
+	strcpy_s(head.method, strtok_s(token, " ", &buf));
+	printf("Method: %s\n", head.method);
+
+	// Host line for http 1.1
+	token = strtok_s(NULL, "\r\n", &buf);
+	printf("Token2: %s\n", token);
+	return head;
 }
 
 void volume_up()
