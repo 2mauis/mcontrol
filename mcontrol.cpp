@@ -235,19 +235,32 @@ void run()
 
 struct req_head parse_request(char *request)
 {
-	char *token, *buf;
+	int headline = 1;
+	char *http_head[16], *token, *buf;
 	struct req_head head;
 	memset(&head, 0, sizeof(head));
 
-	// The initial line
 	token = strtok_s(request, "\r\n", &buf);
-	printf("Token1: %s\n", token);
-	strcpy_s(head.method, strtok_s(token, " ", &buf));
-	printf("Method: %s\n", head.method);
+	http_head[0] = token;
+	while ((token = strtok_s(NULL, "\r\n", &buf)) != NULL)
+	{
+		http_head[headline] = token;
+		headline++;
+	}
+	//printf("Lines: %d\n", headline);
+	int i;
+	for (i = 0; i < headline; i++)
+	{
+		printf("Line %d: %s\n", i, http_head[i]);
+	}
+	//token = strtok_s(request, "\r\n", &buf);
+	//printf("Token1: %s\n", token);
+	//strcpy_s(head.method, strtok_s(token1, " ", &buf));
+	//strcpy_s(head.path, strtok_s(NULL, " ", &buf));
 
-	// Host line for http 1.1
-	token = strtok_s(NULL, "\r\n", &buf);
-	printf("Token2: %s\n", token);
+	//// Host line for http 1.1
+	//token = strtok_s(request, "\r\n", &buf);
+	//printf("Token2: %s\n", token);
 	return head;
 }
 
