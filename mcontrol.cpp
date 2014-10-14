@@ -15,7 +15,7 @@ struct req_head{
 	char path[255];
 };
 
-struct req_head parse_request(char *request);
+struct req_head parse_request_head(char *request);
 
 // volume up
 void volume_up();
@@ -124,25 +124,26 @@ void run()
 
 	char hostname[255];
 	char *ip;
+	char *local = "*";
 	struct hostent *hostinfo;
 	if (gethostname(hostname, sizeof(hostname)) == 0)
 	{
 		if ((hostinfo = gethostbyname(hostname)) != NULL)
 		{
 			ip = inet_ntoa(*(struct in_addr *)*hostinfo->h_addr_list);
-			printf("Server is listening on %s:%d\n", ip, port);
 		}
 		else
-		{
-			printf("Server is listening on *:%d\n", port);
+		{			
+			ip = local;
 		}
 	}
 	else
 	{
-		printf("Server is listening on :*%d\n", port);
+		ip = local;
 	}
+	printf("Server is listening on %s:%d\n", ip, port);
 	char doccmd[BUF_SIZE];
-	sprintf_s(doccmd, BUF_SIZE, "start http://127.0.0.1:%d/html/help.html", port);
+	sprintf_s(doccmd, BUF_SIZE, "start http://%s:%d/html/help.html", ip, port);
 	system(doccmd);
 
 	while (true)
@@ -157,7 +158,7 @@ void run()
 		}
 		//printf("Access success\n");
 
-		char request[4096];
+		char request[BUF_SIZE];
 		char *token, *p;
 		char *content;
 		content = (char *)malloc(sizeof(char)* BUF_SIZE);
@@ -167,7 +168,7 @@ void run()
 		p = (char *)malloc(sizeof(char)* 255);
 
 		int receive_rs = recv(client, request, sizeof(request), 0);
-		parse_request(request);
+		parse_request_head(request);
 		//printf("%s\n", request);
 	
 		token = strtok_s(request, " ", &p);
@@ -233,34 +234,49 @@ void run()
 	closesocket(server_fd);
 }
 
-struct req_head parse_request(char *request)
+struct req_head parse_request_head(char *request)
 {
-	int headline = 1;
-	char *http_head[16], *token, *buf;
+	int i = 0;
+	for (;;)
+	{
+		//printf("%c", request[i]);
+		if (request[i] == '\r' && request[i + 1] == '\n' && request[i + 2] == '\r' && request[i + 3] == '\n')
+		{
+			request[i+2] = '\0';
+			break;
+		}
+		i++;
+	}
+
+	int line_num = 1;
+	char *head_line[16], *token, *buf;
 	struct req_head head;
 	memset(&head, 0, sizeof(head));
 
 	token = strtok_s(request, "\r\n", &buf);
-	http_head[0] = token;
+	head_line[0] = token;
 	while ((token = strtok_s(NULL, "\r\n", &buf)) != NULL)
 	{
-		http_head[headline] = token;
-		headline++;
+		head_line[line_num] = token;
+		line_num++;
 	}
-	//printf("Lines: %d\n", headline);
-	int i;
-	for (i = 0; i < headline; i++)
-	{
-		printf("Line %d: %s\n", i, http_head[i]);
-	}
-	//token = strtok_s(request, "\r\n", &buf);
-	//printf("Token1: %s\n", token);
-	//strcpy_s(head.method, strtok_s(token1, " ", &buf));
-	//strcpy_s(head.path, strtok_s(NULL, " ", &buf));
 
-	//// Host line for http 1.1
-	//token = strtok_s(request, "\r\n", &buf);
-	//printf("Token2: %s\n", token);
+	// Request line
+	token = strtok_s(head_line[0], "\r\n", &buf);
+
+	// Request method
+	strcpy_s(head.method, strtok_s(token, " ", &buf));
+
+	// path/uri
+	token = strtok_s(NULL, " ", &buf);
+	if (token[0] == '/')
+	{
+		strcpy_s(head.path, strtok_s(token, " ", &buf));
+	}
+
+	// Host line for http 1.1
+	token = strtok_s(request, "\r\n", &buf);
+	printf("Token2: %s\n", token);
 	return head;
 }
 
