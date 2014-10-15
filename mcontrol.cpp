@@ -271,6 +271,7 @@ struct req_head parse_request_head(char *request)
 			}
 			else
 			{
+				head.method[j] = '\0';
 				j = 0;
 				status = method_end;
 			}
@@ -282,6 +283,41 @@ struct req_head parse_request_head(char *request)
 				head.path[j++] = request[i];
 				status = path_start;
 			}
+			break;
+
+		case path_start:
+			if (request[i] != ' ')
+			{
+				head.path[j++] = request[i];
+			}
+			else
+			{
+				head.path[j] = '\0';
+				j = 0;
+				status = path_end;
+			}
+			break;
+
+		case path_end:
+			if (request[i] != ' ' && request[i] != 'H' && request[i+1] != 'O')
+			{
+				head.host[j++] = request[i];
+				status = host_start;
+			}
+			break;
+
+		case host_start:
+			if (request != '\0' && request[i] != '\r' && request[i] != '\n')
+			{
+				head.host[j++] = request[i];
+			}
+			else
+			{
+				head.host[j] = '\0';
+				j = 0;
+				status = host_end;
+			}
+			break;
 		}
 		i++;
 	}
