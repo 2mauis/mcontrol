@@ -236,47 +236,57 @@ void run()
 
 struct req_head parse_request_head(char *request)
 {
-	int i = 0;
+	struct req_head head;
+	memset(&head, 0, sizeof(head));
+
+	enum {
+		method_start = 1,
+		method_end,
+		path_start,
+		path_end,
+		ver_start,
+		ver_end,
+		host_start,
+		host_end
+	} status;
+
+	status = method_start;
+
+	int i = 0, j = 0;
 	for (;;)
 	{
 		//printf("%c", request[i]);
 		if (request[i] == '\r' && request[i + 1] == '\n' && request[i + 2] == '\r' && request[i + 3] == '\n')
 		{
-			request[i+2] = '\0';
+			//request[i+2] = '\0';
 			break;
+		}
+
+		switch (status)
+		{
+		case method_start:
+			if (request[i] != ' ')
+			{
+				head.method[j++] = request[i];
+			}
+			else
+			{
+				j = 0;
+				status = method_end;
+			}
+			break;
+
+		case method_end:
+			if (request[i] != ' ')
+			{
+				head.path[j++] = request[i];
+				status = path_start;
+			}
 		}
 		i++;
 	}
-
-	int line_num = 1;
-	char *head_line[16], *token, *buf;
-	struct req_head head;
-	memset(&head, 0, sizeof(head));
-
-	token = strtok_s(request, "\r\n", &buf);
-	head_line[0] = token;
-	while ((token = strtok_s(NULL, "\r\n", &buf)) != NULL)
-	{
-		head_line[line_num] = token;
-		line_num++;
-	}
-
-	// Request line
-	token = strtok_s(head_line[0], "\r\n", &buf);
-
-	// Request method
-	strcpy_s(head.method, strtok_s(token, " ", &buf));
-
-	// path/uri
-	token = strtok_s(NULL, " ", &buf);
-	if (token[0] == '/')
-	{
-		strcpy_s(head.path, strtok_s(token, " ", &buf));
-	}
-
-	// Host line for http 1.1
-	token = strtok_s(request, "\r\n", &buf);
-	printf("Token2: %s\n", token);
+	
+	printf("%s\n", head.method);
 	return head;
 }
 
