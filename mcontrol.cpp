@@ -11,11 +11,14 @@
 
 struct req_head{
 	char method[7];
+	float version;
 	char host[255];
+	int port;
 	char path[255];
 };
 
 struct req_head parse_request_head(char *request);
+void strcpyn(char *dest, const char *source, int start, int length);
 
 // volume up
 void volume_up();
@@ -64,12 +67,16 @@ int load_file(char *file_name, char *content)
 
 	// get file size
 	file_size = ftell(file);
+	if (file_size > sizeof(content))
+	{
+		realloc(content, file_size + 1);
+	}
 
 	// reset file cursor
 	rewind(file);
 
 	// set memory
-	memset(content, 0, file_size + 1);
+	//memset(content, 0, file_size + 1);
 
 	// load file data to content
 	fread(content, sizeof(char), file_size, file);
@@ -78,7 +85,7 @@ int load_file(char *file_name, char *content)
 	fclose(file);
 
 	// set file end
-	content[file_size] = 0;
+	content[file_size + 1] = '\0';
 
 	return file_size;
 }
@@ -141,9 +148,10 @@ void run()
 	{
 		ip = local;
 	}
+
 	printf("Server is listening on %s:%d\n", ip, port);
 	char doccmd[BUF_SIZE];
-	sprintf_s(doccmd, BUF_SIZE, "start http://%s:%d/html/help.html", ip, port);
+	sprintf_s(doccmd, BUF_SIZE, "start http://%s:%d/", ip, port);
 	system(doccmd);
 
 	while (true)
@@ -159,62 +167,56 @@ void run()
 		//printf("Access success\n");
 
 		char request[BUF_SIZE];
-		char *token, *p;
 		char *content;
 		content = (char *)malloc(sizeof(char)* BUF_SIZE);
 		char htmlfile[255];
 
-		token = (char *)malloc(sizeof(char)* 255);
-		p = (char *)malloc(sizeof(char)* 255);
-
 		int receive_rs = recv(client, request, sizeof(request), 0);
-		parse_request_head(request);
-		//printf("%s\n", request);
-	
-		token = strtok_s(request, " ", &p);
-		token = strtok_s(NULL, " ", &p);
-		//printf("%s\n", token);
+		struct req_head head = parse_request_head(request);
+		/*printf("%s\n", head.method);
+		printf("%s\n", head.host);
+		printf("%d\n", head.port);
+		printf("%s\n", head.path);
+		printf("%.1f\n", head.version);*/
 
-		if (token != NULL)
+		if (strcmp(head.path, "/next") == 0)
 		{
-			if (strcmp(token, "/next") == 0)
-			{
-				play_next();
-			}
-			else if (strcmp(token, "/prev") == 0)
-			{
-				play_prev();
-			}
-			else if (strcmp(token, "/play") == 0)
-			{
-				play();
-			}
-			else if (strcmp(token, "/up") == 0)
-			{
-				volume_up();
-			}
-			else if (strcmp(token, "/down") == 0)
-			{
-				volume_down();
-			}
-			else if (strcmp(token, "/mute") == 0)
-			{
-				mute();
-			}
-
-			strcpy_s(htmlfile, token);
+			play_next();
 		}
+		else if (strcmp(head.path, "/prev") == 0)
+		{
+			play_prev();
+		}
+		else if (strcmp(head.path, "/play") == 0)
+		{
+			play();
+		}
+		else if (strcmp(head.path, "/up") == 0)
+		{
+			volume_up();
+		}
+		else if (strcmp(head.path, "/down") == 0)
+		{
+			volume_down();
+		}
+		else if (strcmp(head.path, "/mute") == 0)
+		{
+			mute();
+		}
+		else if (strcmp(head.path, "/") == 0)
+		{
+			strcpy_s(htmlfile, "html/index.html");
+		}	
 		else
 		{
-			char *index = "html/index.html";
-			strcpy_s(htmlfile, index);
+			strcpyn(htmlfile, head.path, 1, sizeof(head) - 1);
 		}
 
 		// 加载要显示的页面
 		char *html;
 		html = (char *)malloc(sizeof(char)* BUF_SIZE);
 		int size_html = load_file(htmlfile, html);
-		//printf("Loading file: %s\n", token);
+		printf("Loading file: %s\n", htmlfile);
 
 		if (size_html == -1)
 		{
@@ -242,17 +244,26 @@ struct req_head parse_request_head(char *request)
 	enum {
 		method_start = 1,
 		method_end,
+
 		path_start,
 		path_end,
+
 		ver_start,
 		ver_end,
+
 		host_start,
-		host_end
+		host_end,
+
+		port_start,
+		port_end,
+
+		head_end,
 	} status;
 
 	status = method_start;
 
 	int i = 0, j = 0;
+	char http_version_str[7], port_str[7];
 	for (;;)
 	{
 		//printf("%c", request[i]);
@@ -273,16 +284,12 @@ struct req_head parse_request_head(char *request)
 			{
 				head.method[j] = '\0';
 				j = 0;
-				status = method_end;
+				status = path_start;
 			}
 			break;
 
 		case method_end:
-			if (request[i] != ' ')
-			{
-				head.path[j++] = request[i];
-				status = path_start;
-			}
+				
 			break;
 
 		case path_start:
@@ -299,31 +306,101 @@ struct req_head parse_request_head(char *request)
 			break;
 
 		case path_end:
-			if (request[i] != ' ' && request[i] != 'H' && request[i+1] != 'O')
+
+			if (toupper(request[i]) == 'H' && toupper(request[i + 1]) == 'T' && toupper(request[i + 2]) == 'T' && toupper(request[i + 3]) == 'P')
 			{
-				head.host[j++] = request[i];
-				status = host_start;
+				i += 4;
+				status = ver_start;
+			}
+			break;
+
+		case ver_start:
+
+			if (request[i] == '\r' || request[i] == '\n')
+			{
+				http_version_str[j] = '\0';
+				j = 0;
+				status = ver_end;
+			}
+			else
+			{
+				http_version_str[j++] = request[i];
+			}
+			break;
+		
+		case ver_end:
+			head.version = atof(http_version_str);
+			if (head.version > 1.0)
+			{
+				if (toupper(request[i]) == 'H' && toupper(request[i + 1]) == 'O' && toupper(request[i + 2]) == 'S' && toupper(request[i + 3]) == 'T')
+				{
+					i += 4;
+					status = host_start;
+				}
+			}
+			else
+			{
+				status = head_end;
 			}
 			break;
 
 		case host_start:
-			if (request != '\0' && request[i] != '\r' && request[i] != '\n')
-			{
-				head.host[j++] = request[i];
-			}
-			else
+
+			if (request[i] == ':')
 			{
 				head.host[j] = '\0';
 				j = 0;
-				status = host_end;
+				status = port_start;
 			}
+			else if (request[i] != ' ')
+			{
+				head.host[j++] = request[i];
+			}
+				
+			break;
+			
+		case host_end:
+
+			break;
+
+		case port_start:	
+			if (request[i] == '\r' || request[i] == '\n')
+			{
+				port_str[j] = '\0';
+				j = 0;
+				status = port_end;
+			}
+			else
+			{
+				port_str[j++] = request[i];
+			}
+			break;
+
+		case port_end:
+			head.port = atoi(port_str);
 			break;
 		}
 		i++;
 	}
 	
-	printf("%s\n", head.method);
 	return head;
+}
+
+void strcpyn(char *dest, const char *src, int start, int len)
+{
+	for (int i = 0, j = start; j <= len; i++, j++)
+	{
+		if (src[j] == '\0')
+		{
+			dest[i] = '\0';
+			break;
+		}
+		else
+		{
+			dest[i] = src[j];
+		}
+		
+	}
 }
 
 void volume_up()
