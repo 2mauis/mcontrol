@@ -6,6 +6,7 @@
 #include <Windows.h>
 #include <WinSock.h>
 #include <stdlib.h>
+#include <sys/stat.h>
 #pragma comment( lib, "ws2_32.lib" )
 #define BUF_SIZE 4096
 
@@ -13,8 +14,13 @@ struct req_head{
 	char method[7];
 	float version;
 	char host[255];
-	int port;
+	size_t port;
 	char path[255];
+};
+
+struct fbuf{
+	char *buf;
+	size_t buf_size;
 };
 
 struct req_head parse_request_head(char *request);
@@ -41,7 +47,7 @@ void play();
 // start and stop
 void start();
 
-int load_file(char *filename, char *content);
+struct fbuf *load_file(char *filename);
 
 void run();
 
@@ -52,42 +58,36 @@ int _tmain(int argc, _TCHAR* argv[])
 	return 1;
 }
 
-int load_file(char *file_name, char *content)
+struct fbuf *load_file(char *filename)
 {
-	FILE *file;
-	if (fopen_s(&file, file_name, "rb+") != 0)
+	struct _stat sbuf;
+	if (_stat(filename, &sbuf) == -1)
 	{
-		return -1;
+		return NULL;
 	}
-
-	int file_size;
-
-	// set cursor to the end of the file
-	fseek(file, 0L, SEEK_END);
-
-	// get file size
-	file_size = ftell(file);
-	if (file_size > sizeof(content))
+	
+	struct fbuf *ct;
+	if ((ct = (struct fbuf *)malloc(sizeof(struct fbuf))) == NULL)
 	{
-		realloc(content, file_size + 1);
+		return NULL;
 	}
+	ct->buf_size = sbuf.st_size;
+	ct->buf = (char *)calloc(ct->buf_size, sizeof(char));
 
-	// reset file cursor
-	rewind(file);
-
-	// set memory
-	//memset(content, 0, file_size + 1);
+	FILE *fd;
+	if (fopen_s(&fd, filename, "r") != 0)
+	{
+		return NULL;
+	}
 
 	// load file data to content
-	fread(content, sizeof(char), file_size, file);
+	fread(ct->buf, sizeof(char), ct->buf_size, fd);
+	ct->buf[ct->buf_size] = '\0';
 
 	// close the stream
-	fclose(file);
+	fclose(fd);
 
-	// set file end
-	content[file_size + 1] = '\0';
-
-	return file_size;
+	return ct;
 }
 
 
@@ -152,7 +152,7 @@ void run()
 	printf("Server is listening on %s:%d\n", ip, port);
 	char doccmd[BUF_SIZE];
 	sprintf_s(doccmd, BUF_SIZE, "start http://%s:%d/", ip, port);
-	system(doccmd);
+	//system(doccmd);
 
 	while (true)
 	{
@@ -164,20 +164,12 @@ void run()
 		{
 			printf("Invalid socket");
 		}
-		//printf("Access success\n");
 
 		char request[BUF_SIZE];
-		char *content;
-		content = (char *)malloc(sizeof(char)* BUF_SIZE);
 		char htmlfile[255];
 
 		int receive_rs = recv(client, request, sizeof(request), 0);
 		struct req_head head = parse_request_head(request);
-		/*printf("%s\n", head.method);
-		printf("%s\n", head.host);
-		printf("%d\n", head.port);
-		printf("%s\n", head.path);
-		printf("%.1f\n", head.version);*/
 
 		if (strcmp(head.path, "/next") == 0)
 		{
@@ -213,18 +205,20 @@ void run()
 		}
 
 		// 加载要显示的页面
-		char *html;
-		html = (char *)malloc(sizeof(char)* BUF_SIZE);
-		int size_html = load_file(htmlfile, html);
+		struct fbuf *html = load_file(htmlfile);
 		printf("Loading file: %s\n", htmlfile);
 
-		if (size_html == -1)
+		char *content;
+		if (html == NULL)
 		{
+			content = (char *)calloc(BUF_SIZE, sizeof(char));
 			sprintf_s(content, BUF_SIZE, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n%s", BUF_SIZE, "<h1>404 NOT FOUND</h1>");
 		}
 		else
 		{
-			sprintf_s(content, BUF_SIZE, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n%s", size_html, html);
+			size_t total_size = html->buf_size + 44;
+			content = (char *)calloc(total_size, sizeof(char));
+			sprintf_s(content, total_size, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n%s", total_size - 1, html->buf);
 		}
 		receive_rs = send(client, content, strlen(content), 0);
 		free(content);
