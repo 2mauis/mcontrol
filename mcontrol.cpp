@@ -1,12 +1,15 @@
 // mcontrol.cpp : 定义控制台应用程序的入口点。
 //
-
 #include "stdafx.h"
 
 #include <Windows.h>
 #include <WinSock.h>
 #include <stdlib.h>
 #include <sys/stat.h>
+
+#include "mime_types.h"
+#include "mime_extensions.h"
+
 #pragma comment( lib, "ws2_32.lib" )
 #define BUF_SIZE 4096
 
@@ -21,10 +24,12 @@ struct req_head{
 struct fbuf{
 	char *buf;
 	size_t buf_size;
+	char *mime;
 };
 
 struct req_head parse_request_head(char *request);
 void strcpyn(char *dest, const char *source, int start, int length);
+char *get_mime(const char *filename);
 
 // volume up
 void volume_up();
@@ -56,38 +61,6 @@ int _tmain(int argc, _TCHAR* argv[])
 	run();
 
 	return 1;
-}
-
-struct fbuf *load_file(char *filename)
-{
-	struct _stat sbuf;
-	if (_stat(filename, &sbuf) == -1)
-	{
-		return NULL;
-	}
-	
-	struct fbuf *ct;
-	if ((ct = (struct fbuf *)malloc(sizeof(struct fbuf))) == NULL)
-	{
-		return NULL;
-	}
-	ct->buf_size = sbuf.st_size;
-	ct->buf = (char *)calloc(ct->buf_size, sizeof(char));
-
-	FILE *fd;
-	if (fopen_s(&fd, filename, "r") != 0)
-	{
-		return NULL;
-	}
-
-	// load file data to content
-	fread(ct->buf, sizeof(char), ct->buf_size, fd);
-	ct->buf[ct->buf_size] = '\0';
-
-	// close the stream
-	fclose(fd);
-
-	return ct;
 }
 
 
@@ -212,13 +185,13 @@ void run()
 		if (html == NULL)
 		{
 			content = (char *)calloc(BUF_SIZE, sizeof(char));
-			sprintf_s(content, BUF_SIZE, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n%s", BUF_SIZE, "<h1>404 NOT FOUND</h1>");
+			sprintf_s(content, BUF_SIZE, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n%s", 22, "<h1>404 NOT FOUND</h1>");
 		}
 		else
 		{
-			size_t total_size = html->buf_size + 44;
+			size_t total_size = html->buf_size + 67;
 			content = (char *)calloc(total_size, sizeof(char));
-			sprintf_s(content, total_size, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n%s", total_size - 1, html->buf);
+			sprintf_s(content, total_size, "HTTP/1.1 200 OK\r\nContent-Type: %s\r\nContent-Length: %d\r\n\r\n%s", html->mime, strlen(html->buf), html->buf);
 		}
 		receive_rs = send(client, content, strlen(content), 0);
 		free(content);
@@ -229,6 +202,42 @@ void run()
 
 	closesocket(server_fd);
 }
+
+struct fbuf *load_file(char *filename)
+{
+	struct _stat sbuf;
+	if (_stat(filename, &sbuf) == -1)
+	{
+		return NULL;
+	}
+
+	struct fbuf *ct;
+	if ((ct = (struct fbuf *)malloc(sizeof(struct fbuf))) == NULL)
+	{
+		return NULL;
+	}
+	ct->buf_size = sbuf.st_size;
+	ct->buf = (char *)calloc(ct->buf_size, sizeof(char));
+	ct->mime = (char *)calloc(24, sizeof(char));
+
+	FILE *fd;
+	if (fopen_s(&fd, filename, "r") != 0)
+	{
+		return NULL;
+	}
+
+	// load file data to content
+	fread(ct->buf, sizeof(char), ct->buf_size, fd);
+	ct->buf[ct->buf_size] = '\0';
+	
+	strcpy_s(ct->mime, sizeof(char)*24, get_mime(filename));
+
+	// close the stream
+	fclose(fd);
+
+	return ct;
+}
+
 
 struct req_head parse_request_head(char *request)
 {
@@ -395,6 +404,25 @@ void strcpyn(char *dest, const char *src, int start, int len)
 		}
 		
 	}
+}
+
+char *get_mime(const char *file)
+{
+	char *mime = (char *)calloc(24, sizeof(char));
+	char *ext = (char *)calloc(10, sizeof(char));
+	strcpy_s(ext, sizeof(char)*10, strrchr(file, '.'));
+	strcpyn(ext, strrchr(file, '.'), 1, 10);
+	printf("ext: %s\n", ext);
+
+	for (int i = 0; i < MNUM_MIME_EXTENSIONS; i++) {
+		if (strcmp(ext, mime_extensions[i]) == 0)
+		{
+			if (mime == NULL) return NULL;
+			strcpy_s(mime, sizeof(char)*24, mime_types[i]);
+			printf("mime: %s\n", mime);
+		}
+	}
+	return mime;
 }
 
 void volume_up()
