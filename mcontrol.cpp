@@ -59,6 +59,44 @@ void run();
 int _tmain(int argc, _TCHAR* argv[])
 {
 	run();
+	/*
+	FILE *fin, *fout;
+	char *buf;
+	size_t len;
+	if (fopen_s(&fin, "1.jpg", "rb") != 0) {
+		printf("Error occured while opening 1.jpg.\n");
+		return 0;
+	}
+
+	fseek(fin, 0, SEEK_END);
+	len = ftell(fin);
+	fseek(fin, 0, SEEK_SET);
+	printf("File size: %d\n", len);
+
+	if ((buf = (char *)malloc(len)) == NULL) {
+		printf("Error occured while malloc memory.\n");
+		return 0;
+	}
+
+	fread(buf, sizeof(char), len, fin);
+	fclose(fin);
+
+	printf("buf: %s\n", buf);
+
+	// write
+	if (fopen_s(&fout, "1.out.jpg", "wb") != 0) {
+		printf("Error occured while opening 1.out.jpg.\n");
+		return 0;
+	}
+
+	//fputs(buf, fout);
+	fwrite(buf, len, 1, fout);
+	fclose(fout);
+
+	free(buf);
+
+	while (1) {}
+	*/
 
 	return 1;
 }
@@ -191,7 +229,7 @@ void run()
 		{
 			size_t total_size = html->buf_size + 67;
 			content = (char *)calloc(total_size, sizeof(char));
-			sprintf_s(content, total_size, "HTTP/1.1 200 OK\r\nContent-Type: %s\r\nContent-Length: %d\r\n\r\n%s", html->mime, strlen(html->buf), html->buf);
+			sprintf_s(content, total_size, "HTTP/1.1 200 OK\r\nContent-Type: %s\r\nContent-Length: %d\r\n\r\n%s", html->mime, html->buf_size * sizeof(char), html->buf);
 		}
 		receive_rs = send(client, content, strlen(content), 0);
 		free(content);
@@ -210,30 +248,36 @@ struct fbuf *load_file(char *filename)
 	{
 		return NULL;
 	}
-
+	
 	struct fbuf *ct;
 	if ((ct = (struct fbuf *)malloc(sizeof(struct fbuf))) == NULL)
 	{
 		return NULL;
 	}
+
 	ct->buf_size = sbuf.st_size;
 	ct->buf = (char *)calloc(ct->buf_size, sizeof(char));
 	ct->mime = (char *)calloc(24, sizeof(char));
+	printf("size: %d\n", ct->buf_size);
 
-	FILE *fd;
-	if (fopen_s(&fd, filename, "r") != 0)
+	FILE *fd, *fd_out;
+	if (fopen_s(&fd, filename, "rb") != 0)
 	{
 		return NULL;
 	}
-
+	
 	// load file data to content
 	fread(ct->buf, sizeof(char), ct->buf_size, fd);
-	ct->buf[ct->buf_size] = '\0';
-	
+	//ct->buf[ct->buf_size] = '\0';
+
 	strcpy_s(ct->mime, sizeof(char)*24, get_mime(filename));
+
+	fopen_s(&fd_out, "2.jpg", "wb");
+	fwrite(ct->buf, ct->buf_size, 1, fd_out);
 
 	// close the stream
 	fclose(fd);
+	fclose(fd_out);
 
 	return ct;
 }
