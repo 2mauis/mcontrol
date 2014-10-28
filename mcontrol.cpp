@@ -28,7 +28,7 @@ struct fbuf{
 };
 
 struct req_head parse_request_head(char *request);
-void strcpyn(char *dest, const char *source, int start, int length);
+void strcpyn(char *dest, char *source, int start, int length);
 char *get_mime(const char *filename);
 
 // volume up
@@ -59,44 +59,6 @@ void run();
 int _tmain(int argc, _TCHAR* argv[])
 {
 	run();
-	/*
-	FILE *fin, *fout;
-	char *buf;
-	size_t len;
-	if (fopen_s(&fin, "1.jpg", "rb") != 0) {
-		printf("Error occured while opening 1.jpg.\n");
-		return 0;
-	}
-
-	fseek(fin, 0, SEEK_END);
-	len = ftell(fin);
-	fseek(fin, 0, SEEK_SET);
-	printf("File size: %d\n", len);
-
-	if ((buf = (char *)malloc(len)) == NULL) {
-		printf("Error occured while malloc memory.\n");
-		return 0;
-	}
-
-	fread(buf, sizeof(char), len, fin);
-	fclose(fin);
-
-	printf("buf: %s\n", buf);
-
-	// write
-	if (fopen_s(&fout, "1.out.jpg", "wb") != 0) {
-		printf("Error occured while opening 1.out.jpg.\n");
-		return 0;
-	}
-
-	//fputs(buf, fout);
-	fwrite(buf, len, 1, fout);
-	fclose(fout);
-
-	free(buf);
-
-	while (1) {}
-	*/
 
 	return 1;
 }
@@ -185,26 +147,32 @@ void run()
 		if (strcmp(head.path, "/next") == 0)
 		{
 			play_next();
+			strcpy_s(htmlfile, "html/index.html");
 		}
 		else if (strcmp(head.path, "/prev") == 0)
 		{
 			play_prev();
+			strcpy_s(htmlfile, "html/index.html");
 		}
 		else if (strcmp(head.path, "/play") == 0)
 		{
 			play();
+			strcpy_s(htmlfile, "html/index.html");
 		}
 		else if (strcmp(head.path, "/up") == 0)
 		{
 			volume_up();
+			strcpy_s(htmlfile, "html/index.html");
 		}
 		else if (strcmp(head.path, "/down") == 0)
 		{
 			volume_down();
+			strcpy_s(htmlfile, "html/index.html");
 		}
 		else if (strcmp(head.path, "/mute") == 0)
 		{
 			mute();
+			strcpy_s(htmlfile, "html/index.html");
 		}
 		else if (strcmp(head.path, "/") == 0)
 		{
@@ -217,21 +185,27 @@ void run()
 
 		// 加载要显示的页面
 		struct fbuf *html = load_file(htmlfile);
-		printf("Loading file: %s\n", htmlfile);
+		//printf("Loading file: %s\n", htmlfile);
 
 		char *content;
 		if (html == NULL)
 		{
 			content = (char *)calloc(BUF_SIZE, sizeof(char));
 			sprintf_s(content, BUF_SIZE, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n%s", 22, "<h1>404 NOT FOUND</h1>");
+			send(client, content, strlen(content), 0);
 		}
 		else
 		{
 			size_t total_size = html->buf_size + 67;
 			content = (char *)calloc(total_size, sizeof(char));
-			sprintf_s(content, total_size, "HTTP/1.1 200 OK\r\nContent-Type: %s\r\nContent-Length: %d\r\n\r\n%s", html->mime, html->buf_size * sizeof(char), html->buf);
+			sprintf_s(content, total_size, "HTTP/1.1 200 OK\r\nContent-Type: %s\r\nContent-Length: %d\r\n\r\n", html->mime, html->buf_size * sizeof(char));
+			// send head
+			send(client, content, strlen(content), 0);
+
+			// send body
+			send(client, html->buf, html->buf_size, 0);
 		}
-		receive_rs = send(client, content, strlen(content), 0);
+		
 		free(content);
 		free(html);
 
@@ -258,9 +232,8 @@ struct fbuf *load_file(char *filename)
 	ct->buf_size = sbuf.st_size;
 	ct->buf = (char *)calloc(ct->buf_size, sizeof(char));
 	ct->mime = (char *)calloc(24, sizeof(char));
-	printf("size: %d\n", ct->buf_size);
 
-	FILE *fd, *fd_out;
+	FILE *fd;
 	if (fopen_s(&fd, filename, "rb") != 0)
 	{
 		return NULL;
@@ -268,16 +241,12 @@ struct fbuf *load_file(char *filename)
 	
 	// load file data to content
 	fread(ct->buf, sizeof(char), ct->buf_size, fd);
-	//ct->buf[ct->buf_size] = '\0';
+	ct->buf[ct->buf_size] = '\0';
 
 	strcpy_s(ct->mime, sizeof(char)*24, get_mime(filename));
 
-	fopen_s(&fd_out, "2.jpg", "wb");
-	fwrite(ct->buf, ct->buf_size, 1, fd_out);
-
 	// close the stream
 	fclose(fd);
-	fclose(fd_out);
 
 	return ct;
 }
@@ -433,7 +402,7 @@ struct req_head parse_request_head(char *request)
 	return head;
 }
 
-void strcpyn(char *dest, const char *src, int start, int len)
+void strcpyn(char *dest, char *src, int start, int len)
 {
 	for (int i = 0, j = start; j <= len; i++, j++)
 	{
@@ -455,15 +424,13 @@ char *get_mime(const char *file)
 	char *mime = (char *)calloc(24, sizeof(char));
 	char *ext = (char *)calloc(10, sizeof(char));
 	strcpy_s(ext, sizeof(char)*10, strrchr(file, '.'));
-	strcpyn(ext, strrchr(file, '.'), 1, 10);
-	printf("ext: %s\n", ext);
+	strcpyn(ext, (char *)strrchr(file, '.'), 1, 10);
 
 	for (int i = 0; i < MNUM_MIME_EXTENSIONS; i++) {
 		if (strcmp(ext, mime_extensions[i]) == 0)
 		{
 			if (mime == NULL) return NULL;
 			strcpy_s(mime, sizeof(char)*24, mime_types[i]);
-			printf("mime: %s\n", mime);
 		}
 	}
 	return mime;
