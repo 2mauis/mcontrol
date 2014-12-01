@@ -52,6 +52,8 @@ void play();
 // start and stop
 void start();
 
+void poweroff();
+
 struct fbuf *load_file(char *filename);
 
 void run();
@@ -59,7 +61,6 @@ void run();
 int _tmain(int argc, _TCHAR* argv[])
 {
 	run();
-
 	return 1;
 }
 
@@ -143,6 +144,7 @@ void run()
 
 		int receive_rs = recv(client, request, sizeof(request), 0);
 		struct req_head head = parse_request_head(request);
+		printf("Request: %s\n", head.path);
 
 		if (strcmp(head.path, "/next") == 0)
 		{
@@ -172,6 +174,11 @@ void run()
 		else if (strcmp(head.path, "/mute") == 0)
 		{
 			mute();
+			strcpy_s(htmlfile, "html/index.html");
+		}
+		else if (strcmp(head.path, "/shutdown") == 0)
+		{
+			poweroff();
 			strcpy_s(htmlfile, "html/index.html");
 		}
 		else if (strcmp(head.path, "/") == 0)
@@ -229,7 +236,7 @@ struct fbuf *load_file(char *filename)
 		return NULL;
 	}
 
-	ct->buf_size = sbuf.st_size;
+	ct->buf_size = sbuf.st_size + 1;
 	ct->buf = (char *)calloc(ct->buf_size, sizeof(char));
 	ct->mime = (char *)calloc(24, sizeof(char));
 
@@ -476,4 +483,9 @@ void start()
 {
 	keybd_event(VK_MEDIA_STOP, 0, 0, 0);
 	keybd_event(VK_MEDIA_STOP, 0, KEYEVENTF_KEYUP, 0);
+}
+
+void poweroff()
+{
+	system("shutdown -s -t 60");
 }
