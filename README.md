@@ -7,4 +7,4 @@ Just Download the codes and run Release/mcontrol.exe (may ask you to change fire
 
 Tested with wind7 and win8.
 
-![image](https://github.com/veapon/mcontrol/screenshot.png)
+![image](https://github.com/veapon/mcontrol/raw/master/screenshot.png)
